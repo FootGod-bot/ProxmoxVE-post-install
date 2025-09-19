@@ -1,15 +1,19 @@
 #!/usr/bin/env bash
 # Proxmox VE Firewall Rule Setup
 # Adds required and optional firewall rules
+# Compatible with Proxmox VE 8/9
 
 set -euo pipefail
 
 # Function to add a firewall rule safely
 add_rule() {
-    local rule_type="$1"
-    local port_or_icmp="$2"
-    echo "Adding firewall rule: $rule_type $port_or_icmp"
-    pve-firewall local allow "$port_or_icmp"
+    local rule="$1"
+    if ! pve-firewall status &>/dev/null; then
+        echo "Proxmox firewall is not enabled. Enabling..."
+        pve-firewall enable
+    fi
+    echo "Adding firewall rule: $rule"
+    pve-firewall allow "$rule"
 }
 
 # Ensure the firewall is enabled
@@ -18,13 +22,14 @@ if ! pve-firewall status &>/dev/null; then
     pve-firewall enable
 fi
 
-# Required: allow port 8006
-add_rule "tcp" "8006"
+echo "Configuring required firewall rules..."
+# Required: allow web GUI
+add_rule "8006/tcp"
 
-# Optional: enable ping
+# Optional: enable ICMP ping
 read -rp "Enable ICMP Ping? (y/n) " yn
 if [[ "$yn" =~ ^[Yy]$ ]]; then
-    add_rule "icmp" ""
+    add_rule "icmp"
 else
     echo "Ping not enabled"
 fi
@@ -32,9 +37,10 @@ fi
 # Optional: enable SSH
 read -rp "Enable SSH (port 22)? (y/n) " yn
 if [[ "$yn" =~ ^[Yy]$ ]]; then
-    add_rule "tcp" "22"
+    add_rule "22/tcp"
 else
     echo "SSH not enabled"
 fi
 
 echo "Firewall rules configured successfully."
+echo "You may verify rules with: pve-firewall status"
